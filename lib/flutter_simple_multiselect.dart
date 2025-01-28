@@ -71,6 +71,7 @@ class FlutterMultiselect<T> extends StatefulWidget {
     this.collapsedHeight,
     this.unfocusedInputDecoration,
     this.leadingSelectionPadding,
+    this.fullBorderRadius = false,
   });
 
   /// Multiple choices
@@ -90,6 +91,9 @@ class FlutterMultiselect<T> extends StatefulWidget {
 
   /// Loader for async fetching
   final bool isLoading;
+
+  // Full border radius
+  final bool fullBorderRadius;
 
   /// Reset the TextField when `onSubmitted` is called
   /// this is default to `false` because when the form is submitted
@@ -290,19 +294,22 @@ class FlutterMultiselectState<T> extends State<FlutterMultiselect<T>> {
                           decoration: BoxDecoration(
                             color: widget.suggestionsBoxBackgroundColor ??
                                 Colors.transparent,
-                            borderRadius: showTop
-                                ? BorderRadius.only(
-                                    topLeft: Radius.circular(
-                                        widget.suggestionsBoxRadius ?? 0),
-                                    topRight: Radius.circular(
-                                        widget.suggestionsBoxRadius ?? 0),
-                                  )
-                                : BorderRadius.only(
-                                    bottomLeft: Radius.circular(
-                                        widget.suggestionsBoxRadius ?? 0),
-                                    bottomRight: Radius.circular(
-                                        widget.suggestionsBoxRadius ?? 0),
-                                  ),
+                            borderRadius: widget.fullBorderRadius
+                                ? BorderRadius.all(Radius.circular(
+                                    widget.suggestionsBoxRadius ?? 0))
+                                : showTop
+                                    ? BorderRadius.only(
+                                        topLeft: Radius.circular(
+                                            widget.suggestionsBoxRadius ?? 0),
+                                        topRight: Radius.circular(
+                                            widget.suggestionsBoxRadius ?? 0),
+                                      )
+                                    : BorderRadius.only(
+                                        bottomLeft: Radius.circular(
+                                            widget.suggestionsBoxRadius ?? 0),
+                                        bottomRight: Radius.circular(
+                                            widget.suggestionsBoxRadius ?? 0),
+                                      ),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.grey.withOpacity(0.5),
