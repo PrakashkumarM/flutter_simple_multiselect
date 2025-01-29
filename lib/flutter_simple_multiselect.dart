@@ -72,6 +72,8 @@ class FlutterMultiselect<T> extends StatefulWidget {
     this.unfocusedInputDecoration,
     this.leadingSelectionPadding,
     this.fullBorderRadius = false,
+    this.errorWidget,
+    this.loaderWidget,
   });
 
   /// Multiple choices
@@ -155,6 +157,8 @@ class FlutterMultiselect<T> extends StatefulWidget {
 
   final double? collapsedHeight;
   final double? leadingSelectionPadding;
+  final Widget? errorWidget;
+  final Widget? loaderWidget;
 
   @override
   FlutterMultiselectState<T> createState() => FlutterMultiselectState<T>();
@@ -671,16 +675,17 @@ class FlutterMultiselectState<T> extends State<FlutterMultiselect<T>> {
             ),
           ),
           if (formError != null)
-            Padding(
-                padding: const EdgeInsets.only(top: 7, left: 20),
-                child: Text(
-                  formError.toString(),
-                  style: widget.errorStyling ??
-                      Theme.of(context)
-                          .textTheme
-                          .bodySmall!
-                          .copyWith(color: Theme.of(context).colorScheme.error),
-                ))
+            if (widget.errorWidget != null)
+              widget.errorWidget!
+            else
+              Padding(
+                  padding: const EdgeInsets.only(top: 7, left: 10),
+                  child: Text(
+                    formError.toString(),
+                    style: widget.errorStyling ??
+                        Theme.of(context).textTheme.bodySmall!.copyWith(
+                            color: Theme.of(context).colorScheme.error),
+                  ))
         ],
       ),
     );
