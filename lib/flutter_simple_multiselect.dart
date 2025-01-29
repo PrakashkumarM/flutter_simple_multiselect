@@ -157,7 +157,7 @@ class FlutterMultiselect<T> extends StatefulWidget {
 
   final double? collapsedHeight;
   final double? leadingSelectionPadding;
-  final Widget? errorWidget;
+  final Widget Function(String)? errorWidget;
   final Widget? loaderWidget;
 
   @override
@@ -676,7 +676,7 @@ class FlutterMultiselectState<T> extends State<FlutterMultiselect<T>> {
           ),
           if (formError != null)
             if (widget.errorWidget != null)
-              widget.errorWidget!
+              widget.errorWidget!(formError ?? '')
             else
               Padding(
                   padding: const EdgeInsets.only(top: 7, left: 10),
