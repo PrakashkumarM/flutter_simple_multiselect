@@ -260,7 +260,7 @@ class FlutterMultiselectState<T> extends State<FlutterMultiselect<T>> {
   void _onFocusChanged() {
     if (_focusNode.hasFocus) {
       _scrollToVisible();
-      _onSearchChanged(_textFieldController.text);
+      _onSearchChanged("");
       setState(() {
         formError = null;
       });
@@ -648,11 +648,11 @@ class FlutterMultiselectState<T> extends State<FlutterMultiselect<T>> {
                             onTap: () {
                               if (_suggestionsBoxController!.isOpened) {
                                 _suggestionsBoxController!.close();
+                              } else {
+                                _suggestionsBoxController!.open();
                               }
                               if (_isFocused) {
-                                print(
-                                    '${_textFieldController.text}_textFieldController.text');
-                                _onSearchChanged(_textFieldController.text);
+                                _onSearchChanged("");
                               }
                             },
                             validator: (value) {
