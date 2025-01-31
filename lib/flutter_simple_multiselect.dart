@@ -179,6 +179,9 @@ class FlutterMultiselectState<T> extends State<FlutterMultiselect<T>> {
   late FocusNode _focusNode;
 
   StreamController<List<T>?>? _suggestionsStreamController;
+  StreamController<bool> _loadingStreamController =
+      StreamController<bool>.broadcast(); // Make it a broadcast stream
+
   SuggestionsBoxController? _suggestionsBoxController;
   final _layerLink = LayerLink();
   List<T>? _suggestions;
@@ -193,6 +196,7 @@ class FlutterMultiselectState<T> extends State<FlutterMultiselect<T>> {
   void initState() {
     super.initState();
     _textFieldController = (widget.controller ?? TextEditingController());
+    _loadingStreamController.add(widget.isLoading);
 
     _focusNode = (widget.focusNode ?? FocusNode())
       ..addListener(_onFocusChanged);
@@ -209,6 +213,17 @@ class FlutterMultiselectState<T> extends State<FlutterMultiselect<T>> {
   }
 
   @override
+  void didUpdateWidget(covariant FlutterMultiselect<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Only update the stream if the isLoading value has changed
+    if (widget.isLoading != oldWidget.isLoading) {
+      // Add the new value to the loading stream
+      _loadingStreamController.add(widget.isLoading);
+    }
+  }
+
+  @override
   void dispose() {
     developer.log('FlutterMultiselectState::dispose():');
     if (widget.autoDisposeFocusNode || widget.focusNode == null) {
@@ -217,6 +232,7 @@ class FlutterMultiselectState<T> extends State<FlutterMultiselect<T>> {
     }
     _suggestionsStreamController?.close();
     _suggestionsBoxController?.close();
+    _loadingStreamController.close();
     super.dispose();
   }
 
@@ -229,18 +245,22 @@ class FlutterMultiselectState<T> extends State<FlutterMultiselect<T>> {
       _onSearchChanged(value);
     });
 
-    _suggestionsBoxController = SuggestionsBoxController(context);
-    _suggestionsStreamController = StreamController<List<T>?>.broadcast();
+    _suggestionsBoxController ??= SuggestionsBoxController(context);
+    _suggestionsStreamController ??= StreamController<List<T>?>.broadcast();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      _createOverlayEntry();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      print(
+          '${_suggestionsBoxController?.overlayEntry}_suggestionsBoxController?.overlayEntry ');
+      if (_suggestionsBoxController?.overlayEntry == null) {
+        _createOverlayEntry(); // Only create if it doesn't exist
+      }
     });
   }
 
   void _onFocusChanged() {
     if (_focusNode.hasFocus) {
       _scrollToVisible();
-      _onSearchChanged("");
+      _onSearchChanged(_textFieldController.text);
       setState(() {
         formError = null;
       });
@@ -270,97 +290,81 @@ class FlutterMultiselectState<T> extends State<FlutterMultiselect<T>> {
               size.height;
           var suggestionBoxHeight =
               max(topAvailableSpace, bottomAvailableSpace);
-          if (null != widget.suggestionsBoxMaxHeight) {
+
+          if (widget.suggestionsBoxMaxHeight != null) {
             suggestionBoxHeight =
                 min(suggestionBoxHeight, widget.suggestionsBoxMaxHeight!);
           }
+
           final showTop = topAvailableSpace > bottomAvailableSpace;
           final compositedTransformFollowerOffset =
               showTop ? Offset(0, -size.height) : Offset.zero;
 
-          return StreamBuilder<List<T>?>(
-            stream: _suggestionsStreamController?.stream,
-            initialData: _suggestions,
-            builder: (context, snapshot) {
-              if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                final suggestionsListView = PointerInterceptor(
-                  child: Padding(
-                    padding: widget.suggestionMargin ?? EdgeInsets.zero,
-                    child: Material(
-                      elevation: widget.suggestionsBoxElevation ?? 20,
-                      borderRadius: BorderRadius.circular(
-                        widget.suggestionsBoxRadius ?? 20,
-                      ),
-                      color: widget.suggestionsBoxBackgroundColor ??
-                          Colors.transparent,
-                      child: Container(
-                          clipBehavior: Clip.hardEdge,
-                          decoration: BoxDecoration(
-                            color: widget.suggestionsBoxBackgroundColor ??
-                                Colors.transparent,
-                            borderRadius: widget.fullBorderRadius
-                                ? BorderRadius.all(Radius.circular(
-                                    widget.suggestionsBoxRadius ?? 0))
-                                : showTop
-                                    ? BorderRadius.only(
-                                        topLeft: Radius.circular(
-                                            widget.suggestionsBoxRadius ?? 0),
-                                        topRight: Radius.circular(
-                                            widget.suggestionsBoxRadius ?? 0),
-                                      )
-                                    : BorderRadius.only(
-                                        bottomLeft: Radius.circular(
-                                            widget.suggestionsBoxRadius ?? 0),
-                                        bottomRight: Radius.circular(
-                                            widget.suggestionsBoxRadius ?? 0),
-                                      ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.5),
-                                spreadRadius: 3,
-                                blurRadius: 10,
-                                offset: Offset(
-                                  0,
-                                  showTop ? -5 : 10,
-                                ), // changes position of shadow
+          return Positioned(
+            width: size.width,
+            child: CompositedTransformFollower(
+              link: _layerLink,
+              showWhenUnlinked: false,
+              offset: compositedTransformFollowerOffset,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  StreamBuilder<List<T>?>(
+                    stream: _suggestionsStreamController?.stream,
+                    initialData: _suggestions,
+                    builder: (context, snapshot) {
+                      final hasSuggestions =
+                          snapshot.hasData && snapshot.data!.isNotEmpty;
+                      return hasSuggestions
+                          ? Material(
+                              elevation: widget.suggestionsBoxElevation ?? 20,
+                              borderRadius: BorderRadius.circular(
+                                  widget.suggestionsBoxRadius ?? 20),
+                              color: widget.suggestionsBoxBackgroundColor ??
+                                  Colors.transparent,
+                              child: Container(
+                                constraints: BoxConstraints(
+                                    maxHeight: suggestionBoxHeight),
+                                child: ListView.builder(
+                                  shrinkWrap: true,
+                                  padding: widget.suggestionPadding ??
+                                      EdgeInsets.zero,
+                                  itemCount: snapshot.data!.length,
+                                  itemBuilder: (context, index) {
+                                    return widget.suggestionBuilder(
+                                        context, this, snapshot.data![index]!);
+                                  },
+                                ),
                               ),
-                            ],
-                          ),
-                          constraints:
-                              BoxConstraints(maxHeight: suggestionBoxHeight),
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            padding:
-                                widget.suggestionPadding ?? EdgeInsets.zero,
-                            itemCount: snapshot.data!.length,
-                            itemBuilder: (context, index) {
-                              return _suggestions != null &&
-                                      _suggestions?.isNotEmpty == true
-                                  ? widget.suggestionBuilder(
-                                      context, this, _suggestions![index]!)
-                                  : Container();
-                            },
-                          )),
-                    ),
+                            )
+                          : SizedBox.shrink();
+                    },
                   ),
-                );
-                return Positioned(
-                  width: size.width,
-                  child: CompositedTransformFollower(
-                    link: _layerLink,
-                    showWhenUnlinked: false,
-                    offset: compositedTransformFollowerOffset,
-                    child: !showTop
-                        ? suggestionsListView
-                        : FractionalTranslation(
-                            translation: const Offset(0, -1),
-                            child: suggestionsListView,
-                          ),
+                  // Use StreamBuilder for Loader
+                  StreamBuilder<bool>(
+                    stream: _loadingStreamController.stream,
+                    initialData: false,
+                    builder: (context, loadingSnapshot) {
+                      if (loadingSnapshot.data == true) {
+                        return widget.loaderWidget != null
+                            ? Positioned.fill(child: widget.loaderWidget!)
+                            : Positioned.fill(
+                                child: Container(
+                                  // color: Colors.black.withOpacity(0.2),
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      color: Colors.blue[300],
+                                    ),
+                                  ),
+                                ),
+                              );
+                      }
+                      return SizedBox.shrink(); // Hide loader if not loading
+                    },
                   ),
-                );
-              }
-              return Container();
-            },
+                ],
+              ),
+            ),
           );
         }
         return Container();
@@ -382,16 +386,17 @@ class FlutterMultiselectState<T> extends State<FlutterMultiselect<T>> {
 
   void _onSearchChanged(String value) async {
     final localId = ++_searchId;
-    _suggestionsBoxController?.close();
+    // _suggestionsBoxController?.close();
     setState(() => _suggestions = []);
     final results = await widget.findSuggestions(value);
     if (_searchId == localId && mounted) {
       setState(() => _suggestions = results);
     }
     _suggestionsStreamController?.add(_suggestions ?? []);
-    if (!(_suggestionsBoxController?.isOpened == true)) {
-      _suggestionsBoxController?.open();
-    }
+
+    // if (!(_suggestionsBoxController?.isOpened == true)) {
+    //   _suggestionsBoxController?.open();
+    // }
   }
 
   void _scrollToVisible() {
@@ -410,6 +415,19 @@ class FlutterMultiselectState<T> extends State<FlutterMultiselect<T>> {
       _resetTextField();
     } else {
       _textFieldController.text = newString ?? "";
+    }
+  }
+
+  void suggestBoxOpenAndClose(bool open) {
+    // open ? _suggestionsBoxController!.open : _suggestionsBoxController!.close;
+    if (open && _suggestionsBoxController?.open != null) {
+      _suggestionsBoxController!.open();
+    } else {
+      _suggestionsBoxController!.close();
+      _focusNode.unfocus(); // This will cancel the focus
+      setState(() {
+        _isFocused = false;
+      });
     }
   }
 
@@ -468,17 +486,7 @@ class FlutterMultiselectState<T> extends State<FlutterMultiselect<T>> {
               )),
           hintText: "Type to search",
         );
-    final decoration = widget.isLoading
-        ? customDec.copyWith(
-            suffixIcon: Container(
-            width: 4,
-            height: 4,
-            padding: const EdgeInsets.all(15),
-            child: const CircularProgressIndicator(
-              strokeWidth: 3,
-            ),
-          ))
-        : customDec;
+    final decoration = customDec;
 
     final flutterMultiselectArea = GestureDetector(
       onTap: () {
@@ -619,6 +627,7 @@ class FlutterMultiselectState<T> extends State<FlutterMultiselect<T>> {
                                               )),
                                         ),
                                     onTap: () {
+                                      print('input on tap${_isFocused}');
                                       if (_isFocused) {
                                         _onSearchChanged("");
                                       }
@@ -637,8 +646,13 @@ class FlutterMultiselectState<T> extends State<FlutterMultiselect<T>> {
                               ))
                         : TextFormField(
                             onTap: () {
+                              if (_suggestionsBoxController!.isOpened) {
+                                _suggestionsBoxController!.close();
+                              }
                               if (_isFocused) {
-                                _onSearchChanged("");
+                                print(
+                                    '${_textFieldController.text}_textFieldController.text');
+                                _onSearchChanged(_textFieldController.text);
                               }
                             },
                             validator: (value) {
