@@ -316,27 +316,67 @@ class FlutterMultiselectState<T> extends State<FlutterMultiselect<T>> {
                       final hasSuggestions =
                           snapshot.hasData && snapshot.data!.isNotEmpty;
                       return hasSuggestions
-                          ? Material(
-                              elevation: widget.suggestionsBoxElevation ?? 20,
-                              borderRadius: BorderRadius.circular(
-                                  widget.suggestionsBoxRadius ?? 20),
-                              color: widget.suggestionsBoxBackgroundColor ??
-                                  Colors.transparent,
-                              child: Container(
-                                constraints: BoxConstraints(
-                                    maxHeight: suggestionBoxHeight),
-                                child: ListView.builder(
-                                  shrinkWrap: true,
-                                  padding: widget.suggestionPadding ??
-                                      EdgeInsets.zero,
-                                  itemCount: snapshot.data!.length,
-                                  itemBuilder: (context, index) {
-                                    return widget.suggestionBuilder(
-                                        context, this, snapshot.data![index]!);
-                                  },
+                          ? PointerInterceptor(
+                              child: Padding(
+                              padding:
+                                  widget.suggestionMargin ?? EdgeInsets.zero,
+                              child: Material(
+                                elevation: widget.suggestionsBoxElevation ?? 20,
+                                color: widget.suggestionsBoxBackgroundColor ??
+                                    Colors.transparent,
+                                child: Container(
+                                  clipBehavior: Clip.hardEdge,
+                                  constraints: BoxConstraints(
+                                      maxHeight: suggestionBoxHeight),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        widget.suggestionsBoxBackgroundColor ??
+                                            Colors.transparent,
+                                    borderRadius: widget.fullBorderRadius
+                                        ? BorderRadius.all(Radius.circular(
+                                            widget.suggestionsBoxRadius ?? 0))
+                                        : showTop
+                                            ? BorderRadius.only(
+                                                topLeft: Radius.circular(widget
+                                                        .suggestionsBoxRadius ??
+                                                    0),
+                                                topRight: Radius.circular(widget
+                                                        .suggestionsBoxRadius ??
+                                                    0),
+                                              )
+                                            : BorderRadius.only(
+                                                bottomLeft: Radius.circular(
+                                                    widget.suggestionsBoxRadius ??
+                                                        0),
+                                                bottomRight: Radius.circular(
+                                                    widget.suggestionsBoxRadius ??
+                                                        0),
+                                              ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.grey.withOpacity(0.5),
+                                        spreadRadius: 3,
+                                        blurRadius: 10,
+                                        offset: Offset(
+                                          0,
+                                          showTop ? -5 : 10,
+                                        ), // changes position of shadow
+                                      ),
+                                    ],
+                                  ),
+                                  child: ListView.builder(
+                                    shrinkWrap: true,
+                                    padding: widget.suggestionPadding ??
+                                        EdgeInsets.zero,
+                                    itemCount: snapshot.data!.length,
+                                    itemBuilder: (context, index) {
+                                      return widget.suggestionBuilder(context,
+                                          this, snapshot.data![index]!);
+                                    },
+                                  ),
                                 ),
                               ),
-                            )
+                            ))
                           : SizedBox.shrink();
                     },
                   ),
